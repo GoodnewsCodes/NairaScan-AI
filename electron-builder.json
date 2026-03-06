@@ -1,0 +1,65 @@
+{
+  "appId": "com.nairascan.ai",
+  "productName": "NairaScan AI",
+  "copyright": "Copyright © 2026 NairaScan AI",
+
+  "directories": {
+    "output": "release",
+    "buildResources": "assets"
+  },
+
+  "files": [
+    "dist/**/*",
+    "src/main.js",
+    "src/preload.js",
+    "package.json"
+  ],
+
+  "extraResources": [
+    {
+      "from": "backend",
+      "to": "backend",
+      "filter": [
+        "**/*",
+        "!venv/**",
+        "!__pycache__/**",
+        "!*.pyc",
+        "!models/**"
+      ]
+    }
+  ],
+
+  "win": {
+    "target": [
+      { "target": "nsis", "arch": ["x64"] }
+    ],
+    "icon": "assets/icon.ico"
+  },
+
+  "mac": {
+    "target": [
+      { "target": "dmg", "arch": ["x64", "arm64"] }
+    ],
+    "icon": "assets/icon.icns",
+    "category": "public.app-category.finance"
+  },
+
+  "linux": {
+    "target": [
+      { "target": "AppImage", "arch": ["x64"] }
+    ],
+    "icon": "assets/icon.png",
+    "category": "Finance"
+  },
+
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "installerIcon": "assets/icon.ico",
+    "uninstallerIcon": "assets/icon.ico",
+    "installerHeaderIcon": "assets/icon.ico",
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "NairaScan AI"
+  }
+}

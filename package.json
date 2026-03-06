@@ -1,0 +1,42 @@
+{
+  "name": "nairascan-ai",
+  "version": "1.0.0",
+  "description": "Local AI-powered Nigerian bank statement analyzer",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "concurrently \"vite\" \"cross-env NODE_ENV=development wait-on http://localhost:5173 && electron .\"",
+    "build": "vite build",
+    "pack": "pnpm build && electron-builder --dir",
+    "dist": "pnpm build && electron-builder",
+    "dist:win": "pnpm build && electron-builder --win",
+    "dist:mac": "pnpm build && electron-builder --mac",
+    "dist:linux": "pnpm build && electron-builder --linux",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["finance", "AI", "naira", "bank-statement", "electron"],
+  "author": "NairaScan AI",
+  "license": "MIT",
+  "build": {
+    "extends": null,
+    "config": "electron-builder.json"
+  },
+  "packageManager": "pnpm@10.26.1",
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "@vitejs/plugin-react": "^5.1.4",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^40.8.0",
+    "electron-builder": "^26.8.1",
+    "tailwindcss": "^4.2.1",
+    "vite": "^7.3.1",
+    "wait-on": "^9.0.4"
+  }
+}

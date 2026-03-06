@@ -1,0 +1,15 @@
+# Don't commit model weights (they are gigabytes large!)
+models/
+*.gguf
+*.bin
+*.safetensors
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+
+# PDF test files (optional)
+# test_data/
