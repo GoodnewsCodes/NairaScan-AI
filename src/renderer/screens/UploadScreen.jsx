@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { UploadCloud, FileText, ChevronRight, X, FolderOpen } from 'lucide-react';
 import { cn } from '../utils';
 
@@ -8,6 +8,7 @@ const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
 export function UploadScreen({ onFilesAccepted }) {
   const [isHovering, setIsHovering] = useState(false);
   const [files, setFiles] = useState([]); // Array of { name, path, size }
+  const fileInputRef = useRef(null);
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
 
@@ -39,7 +40,21 @@ export function UploadScreen({ onFilesAccepted }) {
       if (picked && picked.length > 0) {
         setFiles((prev) => [...prev, ...picked]);
       }
+    } else {
+      // Fallback: trigger hidden <input type="file"> for browser/dev mode
+      fileInputRef.current?.click();
     }
+  };
+
+  const handleFileInputChange = (e) => {
+    const selected = Array.from(e.target.files || []).map((f) => ({
+      name: f.name,
+      path: f.name, // no real OS path in browser, use name as placeholder
+      size: f.size,
+    }));
+    if (selected.length > 0) setFiles((prev) => [...prev, ...selected]);
+    // Reset so same file can be re-selected
+    e.target.value = '';
   };
 
   const handleRemoveFile = (idx) => {
@@ -65,10 +80,10 @@ export function UploadScreen({ onFilesAccepted }) {
       {/* Hero text */}
       <div className="w-full max-w-3xl text-center mb-10">
         <h1 className="text-4xl font-extrabold text-gray-900 mb-4 tracking-tight">
-          Analyze Nigerian Bank Statements
+          Analyze Bank Statements
         </h1>
         <p className="text-lg text-gray-500 max-w-xl mx-auto">
-          Secure, 100% offline analysis of GTBank, Zenith, Access, UBA and more — powered by DeepSeek-VL2 running locally.
+          Secure, 100% offline analysis of bank statements for GTBank, Zenith, Access, UBA and more — powered by Gemma 3 running locally.
         </p>
       </div>
 
@@ -182,6 +197,15 @@ export function UploadScreen({ onFilesAccepted }) {
           </div>
         </div>
       )}
+      {/* Hidden file input fallback for browser/dev mode */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.png,.jpg,.jpeg"
+        multiple
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
     </div>
   );
 }

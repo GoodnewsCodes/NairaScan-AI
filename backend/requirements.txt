@@ -8,7 +8,7 @@ pdf2image==1.17.0
 Pillow==10.4.0
 
 # AI inference (llama.cpp Python bindings)
-llama-cpp-python==0.3.2
+llama-cpp-python==0.3.16
 
 # Data processing & math
 pandas==2.2.2

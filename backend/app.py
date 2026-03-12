@@ -16,8 +16,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from config import HOST, PORT
-from extract import load_images_from_file
+from extract import load_documents
 from model import get_model, run_inference
+from banks import get_extractor
 from process import merge_page_results
 
 # ─── Logging ─────────────────────────────────────────────────────────────────
@@ -37,7 +38,7 @@ _cancel_flag = False
 async def lifespan(app: FastAPI):
     """Pre-load the model on startup so the first request is instant."""
     try:
-        logger.info("Pre-loading DeepSeek-VL2 model...")
+        logger.info("Pre-loading Gemma 3 model...")
         get_model()
         logger.info("Model ready. Server accepting requests.")
     except FileNotFoundError as e:
@@ -70,7 +71,29 @@ def _progress(message: str, progress: int) -> str:
 # ─── Routes ──────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"status": "ok", "model": "deepseek-vl2"}
+    from config import MODEL_PATH
+    import os
+    
+    model_name = MODEL_PATH.name
+    model_exists = MODEL_PATH.exists()
+    
+    # Check if singleton is initialized
+    from model import _llm
+    is_loaded = _llm is not None
+    
+    return {
+        "status": "ok",
+        "model": "gemma-3",
+        "model_file": model_name,
+        "model_exists": model_exists,
+        "is_loaded": is_loaded,
+        "version": "1.0.0"
+    }
+
+
+@app.get("/")
+def root():
+    return {"status": "ok", "message": "NairaScan AI Backend is running"}
 
 
 @app.post("/cancel")
@@ -108,23 +131,31 @@ async def analyze(req: AnalyzeRequest):
 
                 # Load pages from file
                 try:
-                    images = load_images_from_file(file_path)
+                    pages = load_documents(file_path)
                 except Exception as e:
                     yield json.dumps({"type": "error", "message": str(e)}) + "\n"
                     return
 
-                total_pages = len(images)
+                total_pages = len(pages)
+                
+                # Detect bank from first 2 pages + filename for reliability
+                detection_text = file_path + " " + " ".join([p["text"] for p in pages[:2]])
+                extractor = get_extractor(detection_text)
+                
                 yield _progress(
-                    f"{file_name} → {total_pages} page(s) loaded. Running AI inference...",
+                    f"{file_name} → {total_pages} page(s) loaded. Identified: {extractor.bank_name}. Starting AI...",
                     10 + (file_idx * 60 // total_files)
                 )
                 await asyncio.sleep(0)
 
                 # Run inference on each page
-                for page_idx, image in enumerate(images):
+                for page_idx, page_data in enumerate(pages):
                     if _cancel_flag:
                         yield json.dumps({"type": "cancelled"}) + "\n"
                         return
+
+                    image = page_data["image"]
+                    text_context = page_data["text"]
 
                     page_progress = int(
                         10 + ((file_idx + (page_idx + 1) / total_pages) / total_files) * 60
@@ -135,10 +166,10 @@ async def analyze(req: AnalyzeRequest):
                     )
                     await asyncio.sleep(0)
 
-                    # Run model inference in thread executor to avoid blocking
+                    # Run model inference (Image + Text Map)
                     loop = asyncio.get_event_loop()
                     result = await loop.run_in_executor(
-                        None, run_inference, image, page_idx + 1
+                        None, run_inference, image, page_idx + 1, text_context, extractor
                     )
                     page_results.append(result)
 

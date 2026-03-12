@@ -7,6 +7,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Send file paths to the Python backend for analysis
   analyzeFiles: (filePaths) => ipcRenderer.invoke('backend:analyzeFiles', filePaths),
 
+  // Check backend health
+  checkHealth: () => ipcRenderer.invoke('backend:health'),
+
   // Cancel an ongoing analysis
   cancelAnalysis: () => ipcRenderer.invoke('backend:cancelAnalysis'),
 

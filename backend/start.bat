@@ -27,16 +27,16 @@ call venv\Scripts\activate.bat
 
 REM Install dependencies
 echo [2/3] Installing dependencies...
-pip install -r requirements.txt --quiet
+REM pip install -r requirements.txt
 
 REM Check if model exists
-IF NOT EXIST models\deepseek-vl2-small-q4_k_m.gguf (
+IF NOT EXIST models\gemma-3-4b-it-q4_k_m.gguf (
     echo.
     echo [WARNING] Model file not found at:
-    echo   backend\models\deepseek-vl2-small-q4_k_m.gguf
+    echo   backend\models\gemma-3-4b-it-q4_k_m.gguf
     echo.
     echo Download from Hugging Face:
-    echo   https://huggingface.co/bartowski/deepseek-ai_DeepSeek-VL2-Small-GGUF
+    echo   https://huggingface.co/bartowski/Gemma-3-4B-IT-GGUF
     echo.
     echo The server will start in stub mode ^(no actual inference^).
     echo.

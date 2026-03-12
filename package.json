@@ -1,7 +1,7 @@
 {
   "name": "nairascan-ai",
   "version": "1.0.0",
-  "description": "Local AI-powered Nigerian bank statement analyzer",
+  "description": "Local AI-powered bank statement analyzer",
   "main": "src/main.js",
   "scripts": {
     "start": "concurrently \"vite\" \"cross-env NODE_ENV=development wait-on http://localhost:5173 && electron .\"",

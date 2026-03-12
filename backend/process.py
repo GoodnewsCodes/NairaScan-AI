@@ -22,7 +22,7 @@ def merge_page_results(page_results: List[Dict]) -> Dict[str, Any]:
         all_transactions.extend(txns)
 
         # Grab metadata from the first page that has it
-        for key in ("bank", "account_number", "statement_period", "opening_balance", "closing_balance"):
+        for key in ("bank", "account_number", "detected_headers", "statement_period", "opening_balance", "closing_balance"):
             if key not in meta and result.get(key) is not None:
                 meta[key] = result[key]
 

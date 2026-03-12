@@ -8,9 +8,11 @@ from pathlib import Path
 BASE_DIR   = Path(__file__).parent
 MODELS_DIR = BASE_DIR / "models"
 
-# ► Put your DeepSeek-VL2 GGUF file here, e.g.:
-#   backend/models/deepseek-vl2-small-q4_k_m.gguf
-MODEL_PATH = MODELS_DIR / "deepseek-vl2-small-q4_k_m.gguf"
+# ► Put your Gemma 3 GGUF file here.
+#   Recommended for 6GB RAM:
+#   - Gemma-3-4B-IT-GGUF (Multimodal/Vision) - ~3GB
+#   - Gemma-3-1B-IT-GGUF (Text-only) - ~1GB
+MODEL_PATH = MODELS_DIR / "gemma-3-4b-it-Q4_K_M.gguf"
 
 # ─── Server ───────────────────────────────────────────────────────────────────
 HOST = "127.0.0.1"

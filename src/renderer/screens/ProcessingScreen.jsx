@@ -3,19 +3,11 @@ import { Loader2, XCircle } from 'lucide-react';
 
 const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
 
-const MOCK_STEPS = [
-  { progress: 15, msg: "Converting PDF pages to image tensors...", delay: 1000 },
-  { progress: 45, msg: "Running local OCR & vision analysis...", delay: 2500 },
-  { progress: 70, msg: "Extracting transaction tables to JSON...", delay: 4500 },
-  { progress: 85, msg: "Categorizing patterns & detecting anomalies...", delay: 6000 },
-  { progress: 100, msg: "Aggregating totals & finalizing report...", delay: 7500 },
-];
-
 export function ProcessingScreen({ filePaths = [], onComplete, onError }) {
   const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState('Initializing DeepSeek-VL2 Engine...');
+  const [status, setStatus] = useState('Initializing Gemma 3 Engine...');
   const [logs, setLogs] = useState([
-    '> loading model [deepseek-vl2-small-q4_k_m.gguf]',
+    '> loading model [gemma-3-4b-it-q4_k_m.gguf]',
     '> context length: 4096 tokens',
   ]);
   const logsEndRef = useRef(null);
@@ -28,51 +20,39 @@ export function ProcessingScreen({ filePaths = [], onComplete, onError }) {
   }, [logs]);
 
   useEffect(() => {
-    if (isElectron && filePaths.length > 0) {
-      // ── Real Electron path ──────────────────────────────────────────────
-      appendLog(`> sending ${filePaths.length} file(s) to backend...`);
+    if (!isElectron || filePaths.length === 0) {
+      onError('Analysis failed: Environment not supported or no files selected.');
+      return;
+    }
 
-      // Listen for streamed progress events from main process
-      window.electronAPI.onProgress((data) => {
-        if (data.progress !== undefined) setProgress(data.progress);
-        if (data.message) {
-          setStatus(data.message);
-          appendLog(`> ${data.message}`);
-        }
+    // ── Real Electron path ──────────────────────────────────────────────
+    appendLog(`> sending ${filePaths.length} file(s) to backend...`);
+
+    // Listen for streamed progress events from main process
+    window.electronAPI.onProgress((data) => {
+      if (data.progress !== undefined) setProgress(data.progress);
+      if (data.message) {
+        setStatus(data.message);
+        appendLog(`> ${data.message}`);
+      }
+    });
+
+    window.electronAPI.analyzeFiles(filePaths)
+      .then((result) => {
+        appendLog('> analysis complete ✓');
+        window.electronAPI.removeProgressListener();
+        setTimeout(() => onComplete(result), 600);
+      })
+      .catch((err) => {
+        appendLog(`> ERROR: ${err.message}`);
+        window.electronAPI.removeProgressListener();
+        onError(err.message);
       });
 
-      window.electronAPI.analyzeFiles(filePaths)
-        .then((result) => {
-          appendLog('> analysis complete ✓');
-          window.electronAPI.removeProgressListener();
-          setTimeout(() => onComplete(result), 600);
-        })
-        .catch((err) => {
-          appendLog(`> ERROR: ${err.message}`);
-          window.electronAPI.removeProgressListener();
-          onError(err.message);
-        });
-
-      return () => {
-        window.electronAPI.removeProgressListener();
-      };
-    } else {
-      // ── Mock / browser dev path ─────────────────────────────────────────
-      const timers = MOCK_STEPS.map(({ progress: p, msg, delay }) =>
-        setTimeout(() => {
-          setProgress(p);
-          setStatus(msg);
-          appendLog(`> ${msg}`);
-          if (p === 100) {
-            appendLog('> analysis complete ✓');
-            setTimeout(() => onComplete(null), 800);
-          }
-        }, delay)
-      );
-
-      return () => timers.forEach(clearTimeout);
-    }
-  }, []); // run once on mount
+    return () => {
+      window.electronAPI.removeProgressListener();
+    };
+  }, [filePaths, onComplete, onError]);
 
   const handleCancel = async () => {
     if (isElectron) await window.electronAPI.cancelAnalysis();

@@ -7,43 +7,6 @@ import {
 } from 'lucide-react';
 import { cn } from '../utils';
 
-// ─── Mock fallback (used when no backend result is present) ──────────────────
-const MOCK_RESULT = {
-  bank: 'GTBank',
-  account_number: '4022',
-  statement_period: { from: '2025-10-01', to: '2025-10-31' },
-  opening_balance: 1250400,
-  closing_balance: 985200.5,
-  transactions: [
-    { date: '2025-10-28', description: 'UBER NG TRIP',        debit: 4500,       credit: 0,          balance: 985200.50, category: 'Transport'    },
-    { date: '2025-10-27', description: 'SALARY TECHCORP',     debit: 0,          credit: 1200000,    balance: 989700.50, category: 'Income'       },
-    { date: '2025-10-26', description: 'EKO ELECTRICITY',     debit: 20000,      credit: 0,          balance: 210300.50, category: 'Utilities'    },
-    { date: '2025-10-25', description: 'NETFLIX CH',          debit: 4800,       credit: 0,          balance: 190300.50, category: 'Entertainment'},
-    { date: '2025-10-22', description: 'GTB TRANSFER TO OLU', debit: 50000,      credit: 0,          balance: 185500.50, category: 'Transfer'     },
-    { date: '2025-10-21', description: 'AIRTIME PURCHASE MTN',debit: 2000,       credit: 0,          balance: 183500.50, category: 'Utilities'    },
-    { date: '2025-10-20', description: 'CHICKEN REPUBLIC',    debit: 8500,       credit: 0,          balance: 181500.50, category: 'Food'         },
-    { date: '2025-10-18', description: 'BOLT RIDE',           debit: 3200,       credit: 0,          balance: 173000.50, category: 'Transport'    },
-    { date: '2025-10-15', description: 'POS PURCHASE SHOPRITE',debit: 45000,     credit: 0,          balance: 169800.50, category: 'Shopping'     },
-    { date: '2025-10-10', description: 'BANK MAINTENANCE FEE', debit: 525,       credit: 0,          balance: 124800.50, category: 'Bank Charges' },
-  ],
-  summary: {
-    transaction_count: 142,
-    total_credits:  2450000,
-    total_debits:   2715199.5,
-    net_flow:       -265199.5,
-    opening_balance: 1250400,
-    closing_balance:  985200.5,
-    category_totals: {
-      Transfer: 850000, Shopping: 420000, Food: 180000,
-      Utilities: 95000, Transport: 62000, Entertainment: 28000,
-      'Bank Charges': 8000,
-    },
-    anomalies: [
-      { type: 'large_debit',            severity: 'high',   date: '2025-10-15', description: 'LARGE POS AT MIDNIGHT',   amount: 145000, note: 'Unusually large debit (>120,000)' },
-      { type: 'duplicate_transaction',  severity: 'medium', date: '2025-10-09', description: 'GTB TRANSFER TO JOHN',    amount: 25000,  note: 'Possible duplicate — identical consecutive debit' },
-    ],
-  },
-};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmt = (n) =>
@@ -123,10 +86,10 @@ function AnomalyCard({ anomaly }) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export function ResultsScreen({ result, onReset }) {
-  const data = result || MOCK_RESULT;
-  const isMock = !result;
+export function ResultsScreen({ result, onReset, backendInfo }) {
+  if (!result) return null;
 
+  const data = result;
   const { bank, account_number, statement_period, transactions = [], summary = {} } = data;
   const { total_credits, total_debits, net_flow, category_totals = {}, anomalies = [], transaction_count } = summary;
 
@@ -172,7 +135,7 @@ export function ResultsScreen({ result, onReset }) {
   };
 
   // ── Period label ──
-  const periodLabel = statement_period
+  const periodLabel = (statement_period && statement_period.from)
     ? `${fmtDate(statement_period.from)} → ${fmtDate(statement_period.to)}`
     : 'Statement Period Unknown';
 
@@ -180,14 +143,6 @@ export function ResultsScreen({ result, onReset }) {
   return (
     <div className="flex-1 flex flex-col h-full bg-gray-50/50 animate-in fade-in duration-500 overflow-hidden">
       <div className="flex-1 overflow-y-auto p-8">
-
-        {/* Mock data notice */}
-        {isMock && (
-          <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm font-medium">
-            <AlertTriangle size={16} className="shrink-0 text-amber-500" />
-            Showing demo data — connect the Python backend and analyze a real statement to see live results.
-          </div>
-        )}
 
         {/* Page header */}
         <div className="flex items-start justify-between mb-8 gap-4 flex-wrap">
@@ -198,12 +153,22 @@ export function ResultsScreen({ result, onReset }) {
               </div>
               <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">Statement Analysis</h2>
             </div>
-            <p className="text-gray-500 text-sm ml-11">
+            <p className="text-gray-500 text-sm ml-11 mb-2">
               {bank || 'Unknown Bank'}
               {account_number && ` · ···${account_number}`}
               {' · '}
               {periodLabel}
             </p>
+            {data.detected_headers && data.detected_headers.length > 0 && (
+              <div className="flex items-center gap-2 ml-11 flex-wrap">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Detected Columns:</span>
+                {data.detected_headers.map((h, i) => (
+                  <span key={i} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-medium rounded-md border border-gray-200">
+                    {h}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex gap-3 shrink-0">
             <button
@@ -427,16 +392,19 @@ export function ResultsScreen({ result, onReset }) {
                 <h3 className="font-bold text-sm">Scan Complete</h3>
               </div>
               <p className="text-xs text-primary-100/70 mb-5 leading-relaxed">
-                DeepSeek-VL2 extracted{' '}
+                Gemma 3 extracted{' '}
                 <strong className="text-white">{transaction_count ?? transactions.length}</strong> transactions
                 {anomalies.length > 0 && (
                   <> and flagged <strong className="text-orange-300">{anomalies.length} anomal{anomalies.length === 1 ? 'y' : 'ies'}</strong></>
                 )}.
               </p>
               <div className="grid grid-cols-2 gap-2 text-xs font-mono text-primary-200">
-                <div className="bg-primary-800/40 px-3 py-2 rounded-lg">
+                <div className="bg-primary-800/40 px-3 py-2 rounded-lg col-span-2">
                   <div className="text-primary-400 text-[10px] uppercase mb-1">Model</div>
-                  <div>VL2-Small Q4</div>
+                  <div className="truncate text-[10px]">
+                    {backendInfo?.model_file || 'Gemma 3 4B Q4'}
+                    {backendInfo?.version && ` (v${backendInfo.version})`}
+                  </div>
                 </div>
                 <div className="bg-primary-800/40 px-3 py-2 rounded-lg">
                   <div className="text-primary-400 text-[10px] uppercase mb-1">Mode</div>

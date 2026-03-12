@@ -1,5 +1,5 @@
 """
-model.py — DeepSeek-VL2 model loader and inference
+model.py — Gemma 3 model loader and inference
 Loads the GGUF model once and reuses it across requests.
 """
 import base64
@@ -30,8 +30,8 @@ def get_model():
     if not MODEL_PATH.exists():
         raise FileNotFoundError(
             f"Model not found at: {MODEL_PATH}\n"
-            f"Download a DeepSeek-VL2 GGUF and place it in backend/models/.\n"
-            f"Recommended: deepseek-vl2-small-q4_k_m.gguf (~8GB)"
+            f"Download a Gemma 3 GGUF (e.g. gemma-3-4b-it) and place it in backend/models/.\n"
+            f"See backend/models/README.txt for instructions."
         )
 
     logger.info(f"Loading model from {MODEL_PATH} ...")
@@ -53,71 +53,65 @@ def image_to_base64(image: Image.Image) -> str:
     return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
-SYSTEM_PROMPT = """You are a financial document analysis AI specializing in Nigerian bank statements.
-Your job is to extract ALL transactions from the provided bank statement image and return them as structured JSON.
-
-Rules:
-- Extract every row from transaction tables
-- Include: date, description/narration, debit amount, credit amount, balance
-- Normalize Nigerian date formats (e.g. "28-Oct-2025" → "2025-10-28")
-- Remove currency symbols and commas from amounts; use plain numbers
-- If a field is missing, use null
-- Return ONLY valid JSON — no explanations, no markdown
-
-Output format:
-{
-  "bank": "bank name if visible",
-  "account_number": "last 4 digits if visible",
-  "statement_period": {"from": "YYYY-MM-DD", "to": "YYYY-MM-DD"},
-  "opening_balance": 0.00,
-  "closing_balance": 0.00,
-  "transactions": [
-    {
-      "date": "YYYY-MM-DD",
-      "description": "narration text",
-      "debit": 0.00,
-      "credit": 0.00,
-      "balance": 0.00
-    }
-  ]
-}"""
-
-
-def run_inference(image: Image.Image, page_num: int = 1) -> dict:
+def run_inference(image: Image.Image, page_num: int = 1, text_context: str = "", extractor=None) -> dict:
     """
-    Run the model on a single bank statement page image.
-    Returns parsed transaction JSON.
+    Run the model on a single bank statement page.
+    Uses an extractor class to determine the correct prompts.
     """
     from config import MAX_TOKENS, TEMPERATURE
+    from banks import BankExtractor
+
+    if extractor is None:
+        extractor = BankExtractor()
 
     llm = get_model()
-    img_b64 = image_to_base64(image)
+    
+    model_name = str(MODEL_PATH).lower()
+    is_multimodal = "4b" in model_name or "12b" in model_name or "27b" in model_name
+    
+    system_prompt = extractor.get_system_prompt()
+    user_prompt = extractor.get_user_prompt(page_num, text_context)
 
-    prompt = (
-        f"<image_start><image_data>{img_b64}</image_end>\n\n"
-        f"This is page {page_num} of a Nigerian bank statement. "
-        f"Extract all transactions visible on this page as JSON."
-    )
+    if is_multimodal:
+        img_b64 = image_to_base64(image)
+        prompt = (
+            f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{system_prompt}<|eot_id|>"
+            f"<|start_header_id|>user<|end_header_id|>\n\n<image>\n"
+            f"{user_prompt}<|eot_id|>"
+            f"<|start_header_id|>assistant<|end_header_id|>\n\n"
+        )
+    else:
+        prompt = (
+            f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{system_prompt}<|eot_id|>"
+            f"<|start_header_id|>user<|end_header_id|>\n\n"
+            f"[Page {page_num}] {user_prompt}<|eot_id|>"
+            f"<|start_header_id|>assistant<|end_header_id|>\n\n"
+        )
 
-    logger.info(f"Running inference on page {page_num}...")
+    logger.info(f"Running inference on page {page_num} using {'multimodal' if is_multimodal else 'text-only'} prompt...")
     response = llm(
         prompt,
         max_tokens=MAX_TOKENS,
         temperature=TEMPERATURE,
-        stop=["</s>", "<|end|>"],
+        stop=["<|eot_id|>", "</s>"],
     )
 
     raw = response["choices"][0]["text"].strip()
+    logger.debug(f"Raw AI Output: {raw[:300]}...")
 
-    # Strip any accidental markdown code fences
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-
+    # Robust JSON extraction using regex
+    import re
     try:
-        return json.loads(raw)
+        # Find everything between the first '{' and the last '}'
+        match = re.search(r'(\{.*\})', raw, re.DOTALL)
+        if match:
+            json_str = match.group(1)
+            return json.loads(json_str)
+        else:
+            # Fallback if no braces found
+            return json.loads(raw)
     except json.JSONDecodeError as e:
         logger.error(f"Model returned invalid JSON on page {page_num}: {e}")
-        logger.debug(f"Raw output: {raw[:500]}")
+        # Log a bit of the problematic output for debugging
+        logger.debug(f"Failed JSON string: {raw[:500]}")
         return {"transactions": [], "_parse_error": str(e), "_raw": raw[:500]}
